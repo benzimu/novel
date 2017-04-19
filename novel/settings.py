@@ -64,9 +64,10 @@ ROBOTSTXT_OBEY = False
 
 # Configure item pipelines
 # See http://scrapy.readthedocs.org/en/latest/topics/item-pipeline.html
-#ITEM_PIPELINES = {
-#    'novel.pipelines.SomePipeline': 300,
-#}
+ITEM_PIPELINES = {
+   'novel.pipelines.HrefPipeline': 300,
+   'novel.pipelines.SaveDatabasePipeline': 500
+}
 
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See http://doc.scrapy.org/en/latest/topics/autothrottle.html
@@ -88,3 +89,10 @@ ROBOTSTXT_OBEY = False
 #HTTPCACHE_DIR = 'httpcache'
 #HTTPCACHE_IGNORE_HTTP_CODES = []
 #HTTPCACHE_STORAGE = 'scrapy.extensions.httpcache.FilesystemCacheStorage'
+
+# MySQL配置
+MYSQL_HOST = '172.24.6.177'
+MYSQL_PORT = 3306
+MYSQL_DATABASE = 'novel'
+MYSQL_USER = 'root'
+MYSQL_PASSWORD = 'hjj'
