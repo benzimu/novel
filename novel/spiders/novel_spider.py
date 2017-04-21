@@ -13,6 +13,9 @@ import json
 from novel.items import NovelItem
 from novel.items import ChaptersItem
 
+from novel.utils.UrlParse import get_domain
+from novel.utils.Constant import Constant
+
 
 class NovelSpider(scrapy.Spider):
     name = 'novel'
@@ -74,10 +77,45 @@ class NovelSpider(scrapy.Spider):
 
         chapter_item = ChaptersItem()
         chapter_item['source'] = response.url
-        counts_name = response.xpath("//div[@class='bdb']/h1/text()").extract()[0].strip().split(' ')
 
-        chapter_item['counts'] = counts_name[1]
-        chapter_item['name'] = counts_name[2]
-        chapter_item['content'] = json.dumps(response.xpath("//div[@id='content']/text()").extract())
+        source_domain = get_domain(chapter_item['source'])
+        if not source_domain:
+            logging.error('爬取数据链接出错,请检查小说章节详情链接:{0}'.format(chapter_item['source']))
+            return
+
+        if source_domain == Constant.SOURCE_DOMAIN['DUXS']:
+            counts_name = response.xpath("//div[@class='content']//h1/text()").extract()[0].strip().split(' ')
+            chapter_item['counts'] = counts_name[0]
+            chapter_item['name'] = counts_name[1]
+            chapter_item['content'] = json.dumps(response.xpath("//div[@class='chapter-content']/text()").extract())
+        elif source_domain == Constant.SOURCE_DOMAIN['ASZW']:
+            counts_name = response.xpath("//div[@class='bdb']/h1/text()").extract()[0].strip().split(' ')
+            chapter_item['counts'] = counts_name[1]
+            chapter_item['name'] = counts_name[2]
+            chapter_item['content'] = json.dumps(response.xpath("//div[@id='contents']/text()").extract())
+        elif source_domain == Constant.SOURCE_DOMAIN['BQG']:
+            counts_name = response.xpath("//div[@class='bookname']/h1/text()").extract()[0].strip().split(' ')
+            chapter_item['counts'] = counts_name[0]
+            chapter_item['name'] = counts_name[1]
+            chapter_item['content'] = json.dumps(response.xpath("//div[@id='content']/text()").extract())
+        elif source_domain == Constant.SOURCE_DOMAIN['BQW']:
+            counts_name = response.xpath("//div[@class='read_title']/h1/text()").extract()[0].strip().split(' ')
+            chapter_item['counts'] = counts_name[0]
+            chapter_item['name'] = counts_name[1]
+            chapter_item['content'] = json.dumps(response.xpath("//div[@class='content']/text()").extract())
+        elif source_domain == Constant.SOURCE_DOMAIN['ZW']:
+            counts_name = response.xpath("//div[@class='bdsub']//dd[0]/h1/text()").extract()[0].strip().split(' ')
+            chapter_item['counts'] = counts_name[0]
+            chapter_item['name'] = counts_name[1]
+            chapter_item['content'] = json.dumps(response.xpath("//div[@class='bdsub']//dd[@id='contents']/text()").extract())
+        elif source_domain == Constant.SOURCE_DOMAIN['GLW']:
+            pass
+        elif source_domain == Constant.SOURCE_DOMAIN['SW']:
+            counts_name = response.xpath("//div[@class='bookname']/h1/text()").extract()[0].strip().split(' ')
+            chapter_item['counts'] = counts_name[1]
+            chapter_item['name'] = counts_name[2]
+            chapter_item['content'] = json.dumps(response.xpath("//div[@class='content']/text()").extract())
 
         yield {'novel_item': novel_item, 'chapter_item': chapter_item}
+
+
