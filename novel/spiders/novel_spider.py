@@ -41,14 +41,14 @@ class NovelSpider(scrapy.Spider):
         content = response.xpath("//div[@class='content']/div")
 
         novelitem['picture'] = content[0].xpath("//div[@class='imgShow']/img/@src").extract()[0]
-        novelitem['name'] = content[0].xpath("//div[@class='tit']/h1/text()").extract()[0]
+        novelitem['name'] = content[0].xpath("//div[@class='tit']/h1/text()").extract()[0].strip()
         novelitem['status'] = content[0].xpath("//div[@class='tit']/span/text()").extract()[0]
-        novelitem['author'] = content[0].xpath("//div[@class='author']//a/text()").extract()[0]
+        novelitem['author'] = content[0].xpath("//div[@class='author']//a/text()").extract()[0].strip()
         novelitem['author_href'] = content[0].xpath("//div[@class='author']//a/@href").extract()[0]
-        novelitem['type'] = content[0].xpath("//div[@class='kind']//a/text()").extract()[0]
+        novelitem['type'] = content[0].xpath("//div[@class='kind']//a/text()").extract()[0].strip()
         novelitem['type_href'] = content[0].xpath("//div[@class='kind']//a/@href").extract()[0]
         novelitem['update_time'] = content[0].xpath("//div[@class='updateDate']/span/text()").extract()[0]
-        novelitem['source'] = content[0].xpath("//div[@class='source']/span/text()").extract()[0]
+        novelitem['source'] = content[0].xpath("//div[@class='source']/span/text()").extract()[0].strip()
         novelitem['description'] = content[0].xpath("//div[@class='desc']/text()").extract()[0]
         novelitem['latest_chapters'] = content[0].xpath("//div[@class='last']/a/text()").extract()[0].strip().split(' ')[1]
         novelitem['chapters_categore_href'] = content[0].xpath("//div[@class='allcategore']//a/@href").extract()[0]
@@ -80,7 +80,7 @@ class NovelSpider(scrapy.Spider):
 
         source_domain = get_domain(chapter_item['source'])
         if not source_domain:
-            logging.error('爬取数据链接出错,请检查小说章节详情链接:{0}'.format(chapter_item['source']))
+            logging.error("#####NovelSpider:chapters_detail():爬取数据链接出错,请检查小说章节详情链接:{0}".format(chapter_item['source']))
             return
 
         if source_domain == Constant.SOURCE_DOMAIN['DUXS']:

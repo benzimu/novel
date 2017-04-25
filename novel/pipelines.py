@@ -59,18 +59,12 @@ class SaveDatabasePipeline(object):
             novel_item = item.get('novel_item', None)
             chapter_item = item.get('novel_item', None)
 
-            # query_novel_detail = self.dbpool.runInteraction(self._insert_novel_detail, novel_item)
-            # query_novel_detail.addErrback(self._handle_error, item, spider)
+            query_novel_detail = self.dbpool.runInteraction(self._insert_novel_detail, novel_item)
+            query_novel_detail.addErrback(self._handle_error, item, spider)
 
             query_novel_detail_id = self.dbpool.runInteraction(self._query_novel_detail_id, novel_item)
-            # print '++++++++++++++++:', type(query_novel_detail_id)
-            # print '++++++++++++++++:', dir(query_novel_detail_id)
-            # print '++++++++++++++++:', query_novel_detail_id
-
-            query_novel_detail_id.addCallback(self._test)
+            query_novel_detail_id.addCallback(self._insert_novel_chapters, chapter_item)
             query_novel_detail_id.addErrback(self._handle_error, item, spider)
-            # print 'query_novel_detail_id:', query_novel_detail_id
-            # query_novel_detail_id.addErrback(self._handle_error, item, spider)
 
             return query_novel_detail_id
         except Exception as e:
