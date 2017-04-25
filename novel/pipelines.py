@@ -63,7 +63,8 @@ class SaveDatabasePipeline(object):
             query_novel_detail.addErrback(self._handle_error, item, spider)
 
             query_novel_detail_id = self.dbpool.runInteraction(self._query_novel_detail_id, novel_item)
-            query_novel_detail_id.addCallback(self._insert_novel_chapters, chapter_item)
+
+            query_novel_detail_id.addCallback(self._query_novel_handler, chapter_item)
             query_novel_detail_id.addErrback(self._handle_error, item, spider)
 
             return query_novel_detail_id
@@ -72,9 +73,10 @@ class SaveDatabasePipeline(object):
             logging.error(traceback.print_exc())
             raise e
 
-    def _test(self, result):
-        print '---------------_test()'
+    def _query_novel_handler(self, result, item):
         print '-------------result:', result
+        insert_novel_chapters = self.dbpool.runInteraction(self._insert_novel_chapters, item)
+        insert_novel_chapters.addErrback(self._handle_error, item)
 
     def _insert_novel_detail(self, tx, item):
         try:
@@ -143,6 +145,6 @@ class SaveDatabasePipeline(object):
             logging.error(traceback.print_exc())
             raise e
 
-    def _handle_error(self, failue, item, spider):
+    def _handle_error(self, failue, item=None, spider=None):
         logging.info('#####SaveDatabasePipeline:_handle_error()#####')
         logging.error('#####SaveDatabasePipeline:_handle_error():failue info:{0}#####'.format(failue))
