@@ -45,9 +45,9 @@ class NovelSpider(scrapy.Spider):
         novelitem['name'] = content[0].xpath("//div[@class='tit']/h1/text()").extract()[0].strip()
         novelitem['status'] = content[0].xpath("//div[@class='tit']/span/text()").extract()[0].strip()
         novelitem['author'] = content[0].xpath("//div[@class='author']//a/text()").extract()[0].strip()
-        novelitem['author_href'] = content[0].xpath("//div[@class='author']//a/@href").extract()[0]
+        novelitem['author_href'] = 'http://book.easou.com' + content[0].xpath("//div[@class='author']//a/@href").extract()[0]
         novelitem['type'] = content[0].xpath("//div[@class='kind']//a/text()").extract()[0].strip()
-        novelitem['type_href'] = content[0].xpath("//div[@class='kind']//a/@href").extract()[0]
+        novelitem['type_href'] = 'http://book.easou.com' + content[0].xpath("//div[@class='kind']//a/@href").extract()[0]
         novelitem['update_time'] = content[0].xpath("//div[@class='updateDate']/span/text()").extract()[0]
         novelitem['source'] = content[0].xpath("//div[@class='source']/span/text()").extract()[0].strip()
         novelitem['description'] = content[0].xpath("//div[@class='desc']/text()").extract()[0].strip()
@@ -67,10 +67,10 @@ class NovelSpider(scrapy.Spider):
         headers = {'User-Agent': user_agent}
 
         categores_hrefs = response.xpath("//div[@class='category']/ul//a/@href").extract()
-        print '--------------categores_hrefs_5', categores_hrefs
+        logging.info('#####NovelSpider:chapters_categore():categores_hrefs info:{0}#####'.format(categores_hrefs))
         # 第一次爬取所有的数据，接下来每次爬取最后五条数据
-        categores_hrefs = categores_hrefs[-5:]
-        print '--------------categores_hrefs_5', categores_hrefs
+        # 改进：根据数据库数据判断应该爬取的数据
+        # categores_hrefs = categores_hrefs[-5:]
         for c_item in categores_hrefs:
             yield scrapy.Request('http://book.easou.com' + c_item, headers=headers, callback=self.chapters_detail,
                                  meta={'novel_detail': response.meta['novel_detail']})
