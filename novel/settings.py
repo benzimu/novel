@@ -65,7 +65,7 @@ ROBOTSTXT_OBEY = False
 # Configure item pipelines
 # See http://scrapy.readthedocs.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
-   'novel.pipelines.HrefPipeline': 300,
+   'novel.pipelines.FormatDataPipeline': 300,
    'novel.pipelines.SaveDatabasePipeline': 500
 }
 

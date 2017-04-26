@@ -17,6 +17,7 @@ class Constant(object):
         'BQW': 'biqiwu.com',
         'ZW': '92zw.com',
         'GLW': 'guliw.com',
-        'SW': 'sangwu.org'
+        'SW': 'sangwu.org',
+        'QL': 'qu.la'
     }
 
