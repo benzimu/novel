@@ -12,12 +12,30 @@ import logging
 import json
 from novel.items import NovelItem
 from novel.items import ChaptersItem
+from novel import settings
 
 from novel.utils.UrlParse import get_domain
 from novel.utils.Constant import Constant
 
+from twisted.enterprise import adbapi
+
 
 class NovelSpider(scrapy.Spider):
+    def __init__(self, *args, **kwargs):
+        dbparams = dict(
+            host=settings.MYSQL_HOST,
+            port=settings.MYSQL_PORT,
+            db=settings.MYSQL_DATABASE,
+            user=settings.MYSQL_USER,
+            passwd=settings.MYSQL_PASSWORD,
+            charset='utf8',
+            use_unicode=False
+        )
+        logging.info('#####NovelSpider:__init__():dbparams info : {0}'.format(dbparams))
+
+        self.dbpool = adbapi.ConnectionPool('MySQLdb', **dbparams)
+
+        super(NovelSpider, self).__init__(*args, **kwargs)
 
     name = 'novel'
     allowed_domains = ['book.easou.com']
@@ -70,18 +88,27 @@ class NovelSpider(scrapy.Spider):
         logging.info('#####NovelSpider:chapters_categore():categores_hrefs info:{0}#####'.format(categores_hrefs))
         # 第一次爬取所有的数据，接下来每次爬取最后五条数据
         # 改进：根据数据库数据判断应该爬取的数据
-        # categores_hrefs = categores_hrefs[-5:]
-        for c_item in categores_hrefs:
+        query_latest_chapters_handler = self.dbpool.runInteraction(self._query_latest_chapters)
+        query_latest_chapters_handler.addCallback(self._query_latest_chapters)
+
+        categores_hrefs = categores_hrefs[-5:]
+        for index, c_item in enumerate(categores_hrefs):
             yield scrapy.Request('http://book.easou.com' + c_item, headers=headers, callback=self.chapters_detail,
-                                 meta={'novel_detail': response.meta['novel_detail']})
+                                 meta={'novel_detail': response.meta['novel_detail'], 'chapter_id': index + 1})
+
+    def _query_latest_chapters(self):
+        pass
+
 
     def chapters_detail(self, response):
         logging.info('#####NovelSpider:chapters_detail():response info:{0}#####'.format(response))
 
         novel_item = response.meta['novel_detail']
+        chapter_id = int(response.meta['chapter_id'])
 
         chapter_item = ChaptersItem()
         chapter_item['source'] = response.url
+        chapter_item['res_id'] = chapter_id
 
         source_domain = get_domain(chapter_item['source'])
         logging.info('#####NovelSpider:chapters_detail():source_domain info:{0}#####'.format(source_domain))
@@ -90,53 +117,27 @@ class NovelSpider(scrapy.Spider):
             return
 
         if source_domain == Constant.SOURCE_DOMAIN['DUXS']:
-            counts_name = response.xpath("//div[@class='content']//h1/text()").extract()[0].strip().split(' ')
-            chapter_item['counts'] = counts_name[0]
-            chapter_item['name'] = counts_name[1]
+            chapter_item['name'] = response.xpath("//div[@class='content']//h1/text()").extract()[0].strip()
             chapter_item['content'] = ''.join(response.xpath("//div[@class='chapter-content']/node()").extract()).strip()
         elif source_domain == Constant.SOURCE_DOMAIN['ASZW']:
-            counts_name = response.xpath("//div[@class='bdb']/h1/text()").extract()[0].strip().split(' ')
-            if len(counts_name) == 2:
-                chapter_item['counts'] = counts_name[0]
-                chapter_item['name'] = counts_name[1]
-            elif len(counts_name) == 3:
-                chapter_item['counts'] = counts_name[1]
-                chapter_item['name'] = counts_name[2]
-            chapter_item['content'] = json.dumps(response.xpath("//div[@id='contents']/text()").extract()[0].strip())
+            chapter_item['name'] = response.xpath("//div[@class='bdb']/h1/text()").extract()[0].strip()
+            chapter_item['content'] = ''.join(response.xpath("//div[@id='contents']/text()").extract()[0].strip())
         elif source_domain == Constant.SOURCE_DOMAIN['BQG']:
-            counts_name = response.xpath("//div[@class='bookname']/h1/text()").extract()[0].strip().split(' ')
-            chapter_item['counts'] = counts_name[0]
-            chapter_item['name'] = counts_name[1]
+            chapter_item['name'] = response.xpath("//div[@class='bookname']/h1/text()").extract()[0].strip()
             chapter_item['content'] = ''.join(response.xpath("//div[@id='content']/node()").extract()).strip()
         elif source_domain == Constant.SOURCE_DOMAIN['BQW']:
-            counts_name = response.xpath("//div[@class='read_title']/h1/text()").extract()[0].strip().split(' ')
-            chapter_item['counts'] = counts_name[0]
-            chapter_item['name'] = counts_name[1]
+            chapter_item['name'] = response.xpath("//div[@class='read_title']/h1/text()").extract()[0].strip()
             chapter_item['content'] = ''.join(response.xpath("//div[@class='content']/node()").extract()).strip()
         elif source_domain == Constant.SOURCE_DOMAIN['ZW']:
-            counts_name = response.xpath("//div[@class='bdsub']//dd[0]/h1/text()").extract()[0].strip().split(' ')
-            chapter_item['counts'] = counts_name[0]
-            chapter_item['name'] = counts_name[1]
+            chapter_item['name'] = response.xpath("//div[@class='bdsub']//dd[0]/h1/text()").extract()[0].strip()
             chapter_item['content'] = ''.join(response.xpath("//div[@class='bdsub']//dd[@id='contents']/node()").extract()).strip()
         elif source_domain == Constant.SOURCE_DOMAIN['GLW']:
             pass
         elif source_domain == Constant.SOURCE_DOMAIN['SW']:
-            counts_name = response.xpath("//div[@class='bookname']/h1/text()").extract()[0].strip().split(' ')
-            if len(counts_name) == 2:
-                chapter_item['counts'] = counts_name[0]
-                chapter_item['name'] = counts_name[1]
-            elif len(counts_name) == 3:
-                chapter_item['counts'] = counts_name[1]
-                chapter_item['name'] = counts_name[2]
+            chapter_item['name'] = response.xpath("//div[@class='bookname']/h1/text()").extract()[0].strip()
             chapter_item['content'] = ''.join(response.xpath("//div[@class='content']/node()").extract()).strip()
         elif source_domain == Constant.SOURCE_DOMAIN['QL']:
-            counts_name = response.xpath("//div[@class='bookname']/h1/text()").extract()[0].strip().split(' ')
-            if len(counts_name) == 2:
-                chapter_item['counts'] = counts_name[0]
-                chapter_item['name'] = counts_name[1]
-            elif len(counts_name) == 3:
-                chapter_item['counts'] = counts_name[1]
-                chapter_item['name'] = counts_name[2]
+            chapter_item['name'] = response.xpath("//div[@class='bookname']/h1/text()").extract()[0].strip()
             chapter_item['content'] = ''.join(response.xpath("//div[@id='content']/node()").extract()).strip()
         else:
             logging.error("#####NovelSpider:chapters_detail():没有此域名网站爬取模板，请联系管理员！:{0}".format(chapter_item['source']))

@@ -18,7 +18,7 @@ CREATE TABLE novel_detail (
 
 CREATE TABLE novel_chapters (
   id int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  res_id VARCHAR (255) COMMENT '原始ID',
+  res_id int (11) COMMENT '原始ID',
   novel_detail_id INT(11) COMMENT '小说ID',
   source VARCHAR (255) COMMENT '来源',
   counts VARCHAR (255) COMMENT '第几章',

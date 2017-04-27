@@ -18,21 +18,17 @@ class FormatDataPipeline(object):
         self.base_domain = 'http://book.easou.com'
 
     def process_item(self, item, spider):
-        logging.info('#####HrefPipeline:process_item():item info: {0}#####'.format(item))
+        logging.info('#####FormatDataPipeline:process_item():item info: {0}#####'.format(item))
 
         novel_item = item.get('novel_item', None)
         if novel_item:
-            # if novel_item['author_href']:
-            #     novel_item['author_href'] = self.base_domain + novel_item['author_href']
-            # if novel_item['type_href']:
-            #     novel_item['type_href'] = self.base_domain + novel_item['type_href']
             if not novel_item.get('res_id', None):
                 novel_item['res_id'] = ''
 
         chapter_item = item.get('chapter_item', None)
         if chapter_item:
-            if not chapter_item.get('res_id', None):
-                chapter_item['res_id'] = ''
+            if not chapter_item.get('counts', None):
+                chapter_item['counts'] = ''
 
         return item
 
@@ -67,7 +63,7 @@ class SaveDatabasePipeline(object):
 
             query_novel_detail = self.dbpool.runInteraction(self._query_novel_detail_handler, novel_item)
             # 由于上一步操作是异步的，如果不设置等待时间，可能下一个请求过来时上一个插入还没有处理完，从而导致数据重复
-            time.sleep(1)
+            time.sleep(0.5)
             query_novel_detail.addCallback(self._insert_novel_chapters_handler, chapter_item)
             query_novel_detail.addErrback(self._handle_error, item, spider)
 
@@ -180,10 +176,10 @@ class SaveDatabasePipeline(object):
         try:
             logging.info('#####SaveDatabasePipeline:_query_novel_chapters()#####')
             logging.info('#####SaveDatabasePipeline:_query_novel_chapters():tx info: {0}'.format(tx))
-            query_sql = "select * from novel_chapters where counts=%s and name=%s"
+            query_sql = "select * from novel_chapters where res_id=%s"
             logging.info('#####SaveDatabasePipeline:_query_novel_chapters():query_sql info: {0}#####'.format(query_sql))
 
-            params = (item['counts'], item['name'])
+            params = (item['res_id'],)
             logging.info('#####SaveDatabasePipeline:_query_novel_chapters():params info: {0}#####'.format(params))
 
             tx.execute(query_sql, params)
