@@ -10,6 +10,7 @@
 import scrapy
 import logging
 import json
+import time
 from novel.items import NovelItem
 from novel.items import ChaptersItem
 from novel import settings
@@ -34,13 +35,13 @@ class NovelSpider(scrapy.Spider):
         logging.info('#####NovelSpider:__init__():dbparams info : {0}'.format(dbparams))
 
         self.dbpool = adbapi.ConnectionPool('MySQLdb', **dbparams)
-
+        print '----------self.dbpool:', self.dbpool
         super(NovelSpider, self).__init__(*args, **kwargs)
 
     name = 'novel'
     allowed_domains = ['book.easou.com']
     start_urls = ['http://book.easou.com/w/novel/18670767/0.html']
-        # , 'http://book.easou.com/w/novel/16120847/0.html']
+    # , 'http://book.easou.com/w/novel/16120847/0.html']
 
     # def start_requests(self):
     #     user_agent = 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.22 \
@@ -80,27 +81,39 @@ class NovelSpider(scrapy.Spider):
     def chapters_categore(self, response):
         logging.info('#####NovelSpider:chapters_categore():response info:{0}#####'.format(response))
 
-        user_agent = 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.22 \
-                                                 Safari/537.36 SE 2.X MetaSr 1.0'
-        headers = {'User-Agent': user_agent}
-
         categores_hrefs = response.xpath("//div[@class='category']/ul//a/@href").extract()
         logging.info('#####NovelSpider:chapters_categore():categores_hrefs info:{0}#####'.format(categores_hrefs))
         # 第一次爬取所有的数据，接下来每次爬取最后五条数据
         # 改进：根据数据库数据判断应该爬取的数据
         novel_detail = response.meta['novel_detail']
 
-        query_latest_chapters_handler = self.dbpool.runInteraction(self._query_latest_chapters, novel_detail)
-        query_latest_chapters_handler.addCallback(self._query_latest_chapters)
+        query_latest_chapters_handler = self.dbpool.runInteraction(self._query_latest_chapters, novel_detail, categores_hrefs)
+        query_latest_chapters_handler.addErrback(self._error_handler)
+        return query_latest_chapters_handler
+        # categores_hrefs = categores_hrefs[-5:]
+        # for index, c_item in enumerate(categores_hrefs):
+        #     yield scrapy.Request('http://book.easou.com' + c_item, headers=headers, callback=self.chapters_detail,
+        #                          meta={'novel_detail': response.meta['novel_detail'], 'chapter_id': index + 1})
 
-        categores_hrefs = categores_hrefs[-5:]
+    def _query_latest_chapters(self, tx, novel_detail, categores_hrefs):
+        user_agent = 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.22 \
+                                                         Safari/537.36 SE 2.X MetaSr 1.0'
+        headers = {'User-Agent': user_agent}
+
+        query_detail_sql = "select max(res_id) from novel_chapters where novel_detail_id = " \
+                           "(select id from novel_detail where name=%s and author=%s)"
+        params = (novel_detail['name'], novel_detail['author'])
+        print '--------------:', tx
+        tx.execute(query_detail_sql, params)
+        res = tx.fetchall()
+        if res:
+            categores_hrefs = categores_hrefs[res[0]:]
         for index, c_item in enumerate(categores_hrefs):
             yield scrapy.Request('http://book.easou.com' + c_item, headers=headers, callback=self.chapters_detail,
-                                 meta={'novel_detail': response.meta['novel_detail'], 'chapter_id': index + 1})
+                                 meta={'novel_detail': novel_detail, 'chapter_id': index + 1})
 
-    def _query_latest_chapters(self, tx, novel_detail):
-        pass
-
+    def _error_handler(self, result):
+        logging.error('#####NovelSpider:_error_handler():result info:{0}#####'.format(result))
 
     def chapters_detail(self, response):
         logging.info('#####NovelSpider:chapters_detail():response info:{0}#####'.format(response))
