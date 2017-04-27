@@ -88,7 +88,9 @@ class NovelSpider(scrapy.Spider):
         logging.info('#####NovelSpider:chapters_categore():categores_hrefs info:{0}#####'.format(categores_hrefs))
         # 第一次爬取所有的数据，接下来每次爬取最后五条数据
         # 改进：根据数据库数据判断应该爬取的数据
-        query_latest_chapters_handler = self.dbpool.runInteraction(self._query_latest_chapters)
+        novel_detail = response.meta['novel_detail']
+
+        query_latest_chapters_handler = self.dbpool.runInteraction(self._query_latest_chapters, novel_detail)
         query_latest_chapters_handler.addCallback(self._query_latest_chapters)
 
         categores_hrefs = categores_hrefs[-5:]
@@ -96,7 +98,7 @@ class NovelSpider(scrapy.Spider):
             yield scrapy.Request('http://book.easou.com' + c_item, headers=headers, callback=self.chapters_detail,
                                  meta={'novel_detail': response.meta['novel_detail'], 'chapter_id': index + 1})
 
-    def _query_latest_chapters(self):
+    def _query_latest_chapters(self, tx, novel_detail):
         pass
 
 
