@@ -11,14 +11,14 @@ import scrapy
 import logging
 import json
 import time
+import MySQLdb
+
 from novel.items import NovelItem
 from novel.items import ChaptersItem
 from novel import settings
 
 from novel.utils.UrlParse import get_domain
 from novel.utils.Constant import Constant
-
-from twisted.enterprise import adbapi
 
 
 class NovelSpider(scrapy.Spider):
@@ -34,14 +34,14 @@ class NovelSpider(scrapy.Spider):
         )
         logging.info('#####NovelSpider:__init__():dbparams info : {0}'.format(dbparams))
 
-        self.dbpool = adbapi.ConnectionPool('MySQLdb', **dbparams)
-        print '----------self.dbpool:', self.dbpool
+        self.conn = MySQLdb.connect(**dbparams)
+
         super(NovelSpider, self).__init__(*args, **kwargs)
 
     name = 'novel'
     allowed_domains = ['book.easou.com']
-    start_urls = ['http://book.easou.com/w/novel/18670767/0.html']
-    # , 'http://book.easou.com/w/novel/16120847/0.html']
+    start_urls = ['http://book.easou.com/w/novel/18670767/0.html',
+                  'http://book.easou.com/w/novel/16120847/0.html']
 
     # def start_requests(self):
     #     user_agent = 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.22 \
@@ -81,39 +81,36 @@ class NovelSpider(scrapy.Spider):
     def chapters_categore(self, response):
         logging.info('#####NovelSpider:chapters_categore():response info:{0}#####'.format(response))
 
-        categores_hrefs = response.xpath("//div[@class='category']/ul//a/@href").extract()
-        logging.info('#####NovelSpider:chapters_categore():categores_hrefs info:{0}#####'.format(categores_hrefs))
-        # 第一次爬取所有的数据，接下来每次爬取最后五条数据
-        # 改进：根据数据库数据判断应该爬取的数据
-        novel_detail = response.meta['novel_detail']
-
-        query_latest_chapters_handler = self.dbpool.runInteraction(self._query_latest_chapters, novel_detail, categores_hrefs)
-        query_latest_chapters_handler.addErrback(self._error_handler)
-        return query_latest_chapters_handler
-        # categores_hrefs = categores_hrefs[-5:]
-        # for index, c_item in enumerate(categores_hrefs):
-        #     yield scrapy.Request('http://book.easou.com' + c_item, headers=headers, callback=self.chapters_detail,
-        #                          meta={'novel_detail': response.meta['novel_detail'], 'chapter_id': index + 1})
-
-    def _query_latest_chapters(self, tx, novel_detail, categores_hrefs):
         user_agent = 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.22 \
-                                                         Safari/537.36 SE 2.X MetaSr 1.0'
+                                                                 Safari/537.36 SE 2.X MetaSr 1.0'
         headers = {'User-Agent': user_agent}
 
-        query_detail_sql = "select max(res_id) from novel_chapters where novel_detail_id = " \
+        categores_hrefs = response.xpath("//div[@class='category']/ul//a/@href").extract()
+        logging.info('#####NovelSpider:chapters_categore():categores_hrefs info:{0}#####'.format(categores_hrefs))
+        novel_detail = response.meta['novel_detail']
+
+        cur = self.conn.cursor()
+
+        query_resid_sql = "select res_id from novel_chapters where novel_detail_id = " \
                            "(select id from novel_detail where name=%s and author=%s)"
         params = (novel_detail['name'], novel_detail['author'])
-        print '--------------:', tx
-        tx.execute(query_detail_sql, params)
-        res = tx.fetchall()
-        if res:
-            categores_hrefs = categores_hrefs[res[0]:]
-        for index, c_item in enumerate(categores_hrefs):
-            yield scrapy.Request('http://book.easou.com' + c_item, headers=headers, callback=self.chapters_detail,
-                                 meta={'novel_detail': novel_detail, 'chapter_id': index + 1})
 
-    def _error_handler(self, result):
-        logging.error('#####NovelSpider:_error_handler():result info:{0}#####'.format(result))
+        cur.execute(query_resid_sql, params)
+        res = cur.fetchall()
+        if res:
+            # 上一次爬取小说章节可能由于多种原因导致没有爬取下来，接下来每次爬取最新章节时重复爬取没有入库的章节
+            res_ids = [res_id[0] for res_id in res]
+            categores_hrefs = [(i, categores_hrefs[i-1]) for i in xrange(1, len(categores_hrefs)+1) if i not in res_ids]
+            for index, c_item in categores_hrefs:
+                yield scrapy.Request('http://book.easou.com' + c_item, headers=headers, callback=self.chapters_detail,
+                                     meta={'novel_detail': novel_detail, 'chapter_id': index})
+        else:
+            for index, c_item in enumerate(categores_hrefs):
+                yield scrapy.Request('http://book.easou.com' + c_item, headers=headers, callback=self.chapters_detail,
+                                     meta={'novel_detail': novel_detail, 'chapter_id': index + 1})
+        cur.close()
+        # self.conn.commit()
+        # self.conn.close()
 
     def chapters_detail(self, response):
         logging.info('#####NovelSpider:chapters_detail():response info:{0}#####'.format(response))
@@ -152,6 +149,45 @@ class NovelSpider(scrapy.Spider):
             chapter_item['name'] = response.xpath("//div[@class='bookname']/h1/text()").extract()[0].strip()
             chapter_item['content'] = ''.join(response.xpath("//div[@class='content']/node()").extract()).strip()
         elif source_domain == Constant.SOURCE_DOMAIN['QL']:
+            chapter_item['name'] = response.xpath("//div[@class='bookname']/h1/text()").extract()[0].strip()
+            chapter_item['content'] = ''.join(response.xpath("//div[@id='content']/node()").extract()).strip()
+        elif source_domain == Constant.SOURCE_DOMAIN['XS']:
+            chapter_item['name'] = response.xpath("//div[@class='wrapper_main']/h1/span[@id='htmltimu']/text()").extract()[0].strip()
+            chapter_item['content'] = ''.join(response.xpath("//div[@id='BookText']/node()").extract()).strip()
+        elif source_domain == Constant.SOURCE_DOMAIN['MPZW']:
+            chapter_item['name'] = response.xpath("//div[@class='P_Left']//h1/text()").extract()[0].strip()
+            chapter_item['content'] = ''.join(response.xpath("//div[@id='clickeye_content']/node()").extract()).strip()
+        elif source_domain == Constant.SOURCE_DOMAIN['WXG']:
+            chapter_item['name'] = response.xpath("//div[@class='content']/h1/text()").extract()[0].strip()
+            chapter_item['content'] = ''.join(response.xpath("//div[@id='content']/node()").extract()).strip()
+        elif source_domain == Constant.SOURCE_DOMAIN['ZDD']:
+            chapter_item['name'] = response.xpath("//div[@id='a_main']//h1/text()").extract()[0].strip()
+            chapter_item['content'] = ''.join(response.xpath("//dd[@id='contents']/node()").extract()).strip()
+        elif source_domain == Constant.SOURCE_DOMAIN['ASZWO']:
+            chapter_item['name'] = response.xpath("//div[@class='bdb']/h1/text()").extract()[0].strip()
+            chapter_item['content'] = ''.join(response.xpath("//div[@id='contents']/node()").extract()).strip()
+        elif source_domain == Constant.SOURCE_DOMAIN['KK']:
+            chapter_item['name'] = response.xpath("//h1[@id='title']/text()").extract()[0].strip()
+            chapter_item['content'] = ''.join(response.xpath("//div[@id='content']/node()").extract()).strip()
+        elif source_domain == Constant.SOURCE_DOMAIN['IF']:
+            chapter_item['name'] = response.xpath("//div[@id='wrap']//h1/text()").extract()[0].strip()
+            chapter_item['content'] = ''.join(response.xpath("//div[@id='content']/node()").extract()).strip()
+        elif source_domain == Constant.SOURCE_DOMAIN['KZW']:
+            chapter_item['name'] = response.xpath("//div[@class='bookname']/h1/text()").extract()[0].strip()
+            chapter_item['content'] = ''.join(response.xpath("//div[@id='content']/node()").extract()).strip()
+        elif source_domain == Constant.SOURCE_DOMAIN['YBDU']:
+            chapter_item['name'] = response.xpath("//div[@class='h1title']/h1/text()").extract()[0].strip()
+            chapter_item['content'] = ''.join(response.xpath("//div[@id='htmlContent']/node()").extract()).strip()
+        elif source_domain == Constant.SOURCE_DOMAIN['JZW']:
+            chapter_item['name'] = response.xpath("//div[@class='bookname']/h1/text()").extract()[0].strip()
+            chapter_item['content'] = ''.join(response.xpath("//div[@id='content']/node()").extract()).strip()
+        elif source_domain == Constant.SOURCE_DOMAIN['DJD']:
+            chapter_item['name'] = response.xpath("//div[@id='title']/text()").extract()[0].strip()
+            chapter_item['content'] = ''.join(response.xpath("//div[@id='content1']/node()").extract()).strip()
+        elif source_domain == Constant.SOURCE_DOMAIN['KW']:
+            chapter_item['name'] = response.xpath("//div[@class='chapter_title']/h2/text()").extract()[0].strip()
+            chapter_item['content'] = ''.join(response.xpath("//div[@id='inner']/node()").extract()).strip()
+        elif source_domain == Constant.SOURCE_DOMAIN['RW']:
             chapter_item['name'] = response.xpath("//div[@class='bookname']/h1/text()").extract()[0].strip()
             chapter_item['content'] = ''.join(response.xpath("//div[@id='content']/node()").extract()).strip()
         else:

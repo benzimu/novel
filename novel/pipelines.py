@@ -176,10 +176,10 @@ class SaveDatabasePipeline(object):
         try:
             logging.info('#####SaveDatabasePipeline:_query_novel_chapters()#####')
             logging.info('#####SaveDatabasePipeline:_query_novel_chapters():tx info: {0}'.format(tx))
-            query_sql = "select * from novel_chapters where res_id=%s"
+            query_sql = "select * from novel_chapters where res_id=%s and novel_detail_id=%s"
             logging.info('#####SaveDatabasePipeline:_query_novel_chapters():query_sql info: {0}#####'.format(query_sql))
 
-            params = (item['res_id'],)
+            params = (item['res_id'], item['novel_detail_id'])
             logging.info('#####SaveDatabasePipeline:_query_novel_chapters():params info: {0}#####'.format(params))
 
             tx.execute(query_sql, params)
