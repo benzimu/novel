@@ -85,6 +85,19 @@ class NovelSpider(scrapy.Spider):
                                                                  Safari/537.36 SE 2.X MetaSr 1.0'
         headers = {'User-Agent': user_agent}
 
+        one_page_url = response.url
+
+        # 通过<a>标签判断是否有多页，只有一页时<a>标签为0
+        a_selector = response.xpath("//div[@class='wrap']/a")
+        print '-----------:', a_selector
+        page_urls = []
+        if not a_selector:
+            page_urls.append(response.url)
+        else:
+            # 获取倒数第二个<a>标签的文本内容，此数据为总共的页数
+            total_pages = a_selector[-2].xpath('span/text()').extract()[0].strip()
+            page_urls = []
+            print '++++++++++++:', total_pages
         categores_hrefs = response.xpath("//div[@class='category']/ul//a/@href").extract()
         logging.info('#####NovelSpider:chapters_categore():categores_hrefs info:{0}#####'.format(categores_hrefs))
         novel_detail = response.meta['novel_detail']
@@ -92,11 +105,12 @@ class NovelSpider(scrapy.Spider):
         cur = self.conn.cursor()
 
         query_resid_sql = "select res_id from novel_chapters where novel_detail_id = " \
-                           "(select id from novel_detail where name=%s and author=%s)"
+                          "(select id from novel_detail where name=%s and author=%s)"
         params = (novel_detail['name'], novel_detail['author'])
 
         cur.execute(query_resid_sql, params)
         res = cur.fetchall()
+        logging.info('#####NovelSpider:chapters_categore():res info:{0}#####'.format(res))
         if res:
             # 上一次爬取小说章节可能由于多种原因导致没有爬取下来，接下来每次爬取最新章节时重复爬取没有入库的章节
             res_ids = [res_id[0] for res_id in res]
