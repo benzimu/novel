@@ -90,6 +90,9 @@ ITEM_PIPELINES = {
 #HTTPCACHE_IGNORE_HTTP_CODES = []
 #HTTPCACHE_STORAGE = 'scrapy.extensions.httpcache.FilesystemCacheStorage'
 
+# 默认情况下， RFPDupeFilter 只记录第一次重复的请求。 设置 DUPEFILTER_DEBUG 为 True 将会使其记录所有重复的requests。
+DUPEFILTER_DEBUG = True
+
 # MySQL配置
 MYSQL_HOST = '172.24.6.177'
 MYSQL_PORT = 3306

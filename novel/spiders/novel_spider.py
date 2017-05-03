@@ -76,10 +76,10 @@ class NovelSpider(scrapy.Spider):
         logging.info('#####NovelSpider:parse():novelitem info:{0}#####'.format(novelitem))
 
         yield scrapy.Request('http://book.easou.com' + novelitem['chapters_categore_href'], method='GET',
-                             headers=headers, callback=self.chapters_categore, meta={'novel_detail': novelitem})
+                             headers=headers, callback=self.get_page_urls, meta={'novel_detail': novelitem})
 
-    def chapters_categore(self, response):
-        logging.info('#####NovelSpider:chapters_categore():response info:{0}#####'.format(response))
+    def get_page_urls(self, response):
+        logging.info('#####NovelSpider:get_page_urls():response info:{0}#####'.format(response))
 
         user_agent = 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.22 \
                                                                  Safari/537.36 SE 2.X MetaSr 1.0'
@@ -89,17 +89,37 @@ class NovelSpider(scrapy.Spider):
 
         # 通过<a>标签判断是否有多页，只有一页时<a>标签为0
         a_selector = response.xpath("//div[@class='wrap']/a")
-        print '-----------:', a_selector
         page_urls = []
         if not a_selector:
             page_urls.append(response.url)
         else:
             # 获取倒数第二个<a>标签的文本内容，此数据为总共的页数
             total_pages = a_selector[-2].xpath('span/text()').extract()[0].strip()
-            page_urls = []
-            print '++++++++++++:', total_pages
+            one_page_urls = one_page_url.split('/')
+            for i in xrange(1, int(total_pages)+1):
+                last_url = str(i) + one_page_urls.pop(-1)[1:]
+                one_page_urls.append(last_url)
+                com_url = '/'.join(one_page_urls)
+                page_urls.append(com_url)
+
+        logging.info('#####NovelSpider:get_page_urls():page_urls info:{0}#####'.format(page_urls))
+
+        for page_url in page_urls:
+            yield scrapy.Request(page_url, method='GET', headers=headers, callback=self.chapters_categore,
+                                 meta={'novel_detail': response.meta['novel_detail']}, dont_filter=True)
+
+    def chapters_categore(self, response):
+        logging.info('#####NovelSpider:chapters_categore():response info:{0}#####'.format(response))
+
+        user_agent = 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.22 \
+                                                                         Safari/537.36 SE 2.X MetaSr 1.0'
+        headers = {'User-Agent': user_agent}
+
         categores_hrefs = response.xpath("//div[@class='category']/ul//a/@href").extract()
         logging.info('#####NovelSpider:chapters_categore():categores_hrefs info:{0}#####'.format(categores_hrefs))
+        cur_page = int(response.xpath("//div[@class='wrap']/span[@class='cur']/text()").extract()[0].strip())
+        logging.info('#####NovelSpider:chapters_categore():cur_page info:{0}#####'.format(cur_page))
+
         novel_detail = response.meta['novel_detail']
 
         cur = self.conn.cursor()
@@ -114,17 +134,22 @@ class NovelSpider(scrapy.Spider):
         if res:
             # 上一次爬取小说章节可能由于多种原因导致没有爬取下来，接下来每次爬取最新章节时重复爬取没有入库的章节
             res_ids = [res_id[0] for res_id in res]
-            categores_hrefs = [(i, categores_hrefs[i-1]) for i in xrange(1, len(categores_hrefs)+1) if i not in res_ids]
+            categores_hrefs = [(i, categores_hrefs[i-999*(cur_page-1)-1]) for i in xrange(999*(cur_page-1)+1, self.get_chapter_index(categores_hrefs[-1])+1) if i not in res_ids]
             for index, c_item in categores_hrefs:
                 yield scrapy.Request('http://book.easou.com' + c_item, headers=headers, callback=self.chapters_detail,
                                      meta={'novel_detail': novel_detail, 'chapter_id': index})
         else:
-            for index, c_item in enumerate(categores_hrefs):
+            for c_item in categores_hrefs:
                 yield scrapy.Request('http://book.easou.com' + c_item, headers=headers, callback=self.chapters_detail,
-                                     meta={'novel_detail': novel_detail, 'chapter_id': index + 1})
+                                     meta={'novel_detail': novel_detail, 'chapter_id': self.get_chapter_index(c_item)})
         cur.close()
         # self.conn.commit()
         # self.conn.close()
+
+    def get_chapter_index(self, url):
+        if not url:
+            return None
+        return int(url.split('/').pop(-1).split('.').pop(0))
 
     def chapters_detail(self, response):
         logging.info('#####NovelSpider:chapters_detail():response info:{0}#####'.format(response))
@@ -202,6 +227,15 @@ class NovelSpider(scrapy.Spider):
             chapter_item['name'] = response.xpath("//div[@class='chapter_title']/h2/text()").extract()[0].strip()
             chapter_item['content'] = ''.join(response.xpath("//div[@id='inner']/node()").extract()).strip()
         elif source_domain == Constant.SOURCE_DOMAIN['RW']:
+            chapter_item['name'] = response.xpath("//div[@class='bookname']/h1/text()").extract()[0].strip()
+            chapter_item['content'] = ''.join(response.xpath("//div[@id='content']/node()").extract()).strip()
+        elif source_domain == Constant.SOURCE_DOMAIN['TTSB']:
+            chapter_item['name'] = response.xpath("//div[@class='zhangjieming']/h1/text()").extract()[0].strip()
+            chapter_item['content'] = ''.join(response.xpath("//div[@class='zhangjieTXT']/node()").extract()).strip()
+        elif source_domain == Constant.SOURCE_DOMAIN['DHZW']:
+            chapter_item['name'] = response.xpath("//div[@class='bookname']/h1/text()").extract()[0].strip()
+            chapter_item['content'] = ''.join(response.xpath("//div[@id='BookText']/node()").extract()).strip()
+        elif source_domain == Constant.SOURCE_DOMAIN['58XS']:
             chapter_item['name'] = response.xpath("//div[@class='bookname']/h1/text()").extract()[0].strip()
             chapter_item['content'] = ''.join(response.xpath("//div[@id='content']/node()").extract()).strip()
         else:

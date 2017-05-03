@@ -31,6 +31,9 @@ class Constant(object):
         'JZW': '8jzw.cc',
         'DJD': 'dajiadu.net',
         'KW': 'kiwang.com',
-        'RW': 'ranwen.org'
+        'RW': 'ranwen.org',
+        'TTSB': 'ttshuba.com',
+        'DHZW': 'dhzw.org',
+        '58XS': '58xs.com',
     }
 
