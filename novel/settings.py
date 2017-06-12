@@ -52,9 +52,9 @@ ROBOTSTXT_OBEY = False
 
 # Enable or disable downloader middlewares
 # See http://scrapy.readthedocs.org/en/latest/topics/downloader-middleware.html
-#DOWNLOADER_MIDDLEWARES = {
-#    'novel.middlewares.MyCustomDownloaderMiddleware': 543,
-#}
+DOWNLOADER_MIDDLEWARES = {
+   'novel.middlewares.UserAgentMiddleware': 500,
+}
 
 # Enable or disable extensions
 # See http://scrapy.readthedocs.org/en/latest/topics/extensions.html
@@ -65,8 +65,8 @@ ROBOTSTXT_OBEY = False
 # Configure item pipelines
 # See http://scrapy.readthedocs.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
-   'novel.pipelines.FormatDataPipeline': 300,
-   'novel.pipelines.SaveDatabasePipeline': 500
+   'novel.pipelines.FormatDataPipeline': 600,
+   'novel.pipelines.SaveDatabasePipeline': 601
 }
 
 # Enable and configure the AutoThrottle extension (disabled by default)
@@ -99,3 +99,10 @@ MYSQL_PORT = 3306
 MYSQL_DATABASE = 'novel'
 MYSQL_USER = 'root'
 MYSQL_PASSWORD = 'hjj'
+
+# start_urls配置
+START_URLS = ['http://book.easou.com/w/novel/18670767/0.html',
+              'http://book.easou.com/w/novel/16120847/0.html']
+
+# allowed_domains配置
+ALLOWED_DOMAINS = ['book.easou.com']

@@ -39,22 +39,11 @@ class NovelSpider(scrapy.Spider):
         super(NovelSpider, self).__init__(*args, **kwargs)
 
     name = 'novel'
-    allowed_domains = ['book.easou.com']
-    start_urls = ['http://book.easou.com/w/novel/18670767/0.html',
-                  'http://book.easou.com/w/novel/16120847/0.html']
-
-    # def start_requests(self):
-    #     user_agent = 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.22 \
-    #                              Safari/537.36 SE 2.X MetaSr 1.0'
-    #     headers = {'User-Agent': user_agent}
-    #     yield scrapy.Request(url=self.start_urls[0], method='GET', headers=headers, callback=self.parse)
+    allowed_domains = settings.ALLOWED_DOMAINS
+    start_urls = settings.START_URLS
 
     def parse(self, response):
         logging.info('#####NovelSpider:parse()#####')
-
-        user_agent = 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.22 \
-                                         Safari/537.36 SE 2.X MetaSr 1.0'
-        headers = {'User-Agent': user_agent}
 
         novelitem = NovelItem()
 
@@ -76,14 +65,10 @@ class NovelSpider(scrapy.Spider):
         logging.info('#####NovelSpider:parse():novelitem info:{0}#####'.format(novelitem))
 
         yield scrapy.Request('http://book.easou.com' + novelitem['chapters_categore_href'], method='GET',
-                             headers=headers, callback=self.get_page_urls, meta={'novel_detail': novelitem})
+                             callback=self.get_page_urls, meta={'novel_detail': novelitem})
 
     def get_page_urls(self, response):
         logging.info('#####NovelSpider:get_page_urls():response info:{0}#####'.format(response))
-
-        user_agent = 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.22 \
-                                                                 Safari/537.36 SE 2.X MetaSr 1.0'
-        headers = {'User-Agent': user_agent}
 
         one_page_url = response.url
 
@@ -105,15 +90,11 @@ class NovelSpider(scrapy.Spider):
         logging.info('#####NovelSpider:get_page_urls():page_urls info:{0}#####'.format(page_urls))
 
         for page_url in page_urls:
-            yield scrapy.Request(page_url, method='GET', headers=headers, callback=self.chapters_categore,
+            yield scrapy.Request(page_url, method='GET', callback=self.chapters_categore,
                                  meta={'novel_detail': response.meta['novel_detail']}, dont_filter=True)
 
     def chapters_categore(self, response):
         logging.info('#####NovelSpider:chapters_categore():response info:{0}#####'.format(response))
-
-        user_agent = 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.22 \
-                                                                         Safari/537.36 SE 2.X MetaSr 1.0'
-        headers = {'User-Agent': user_agent}
 
         categores_hrefs = response.xpath("//div[@class='category']/ul//a/@href").extract()
         logging.info('#####NovelSpider:chapters_categore():categores_hrefs info:{0}#####'.format(categores_hrefs))
@@ -136,11 +117,11 @@ class NovelSpider(scrapy.Spider):
             res_ids = [res_id[0] for res_id in res]
             categores_hrefs = [(i, categores_hrefs[i-999*(cur_page-1)-1]) for i in xrange(999*(cur_page-1)+1, self.get_chapter_index(categores_hrefs[-1])+1) if i not in res_ids]
             for index, c_item in categores_hrefs:
-                yield scrapy.Request('http://book.easou.com' + c_item, headers=headers, callback=self.chapters_detail,
+                yield scrapy.Request('http://book.easou.com' + c_item, callback=self.chapters_detail,
                                      meta={'novel_detail': novel_detail, 'chapter_id': index})
         else:
             for c_item in categores_hrefs:
-                yield scrapy.Request('http://book.easou.com' + c_item, headers=headers, callback=self.chapters_detail,
+                yield scrapy.Request('http://book.easou.com' + c_item, callback=self.chapters_detail,
                                      meta={'novel_detail': novel_detail, 'chapter_id': self.get_chapter_index(c_item)})
         cur.close()
         # self.conn.commit()
