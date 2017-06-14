@@ -25,10 +25,22 @@ class FormatDataPipeline(object):
             if not novel_item.get('res_id', None):
                 novel_item['res_id'] = ''
 
+            if not novel_item.get('author_href', None):
+                novel_item['author_href'] = ''
+
+            if not novel_item.get('type_href', None):
+                novel_item['type_href'] = ''
+
+            if not novel_item.get('source', None):
+                novel_item['source'] = ''
+
         chapter_item = item.get('chapter_item', None)
         if chapter_item:
             if not chapter_item.get('counts', None):
                 chapter_item['counts'] = ''
+
+            if not chapter_item.get('res_id', None):
+                chapter_item['res_id'] = None
 
         return item
 
@@ -176,10 +188,10 @@ class SaveDatabasePipeline(object):
         try:
             logging.info('#####SaveDatabasePipeline:_query_novel_chapters()#####')
             logging.info('#####SaveDatabasePipeline:_query_novel_chapters():tx info: {0}'.format(tx))
-            query_sql = "select * from novel_chapters where res_id=%s and novel_detail_id=%s"
+            query_sql = "select * from novel_chapters where name=%s and novel_detail_id=%s"
             logging.info('#####SaveDatabasePipeline:_query_novel_chapters():query_sql info: {0}#####'.format(query_sql))
 
-            params = (item['res_id'], item['novel_detail_id'])
+            params = (item['name'], item['novel_detail_id'])
             logging.info('#####SaveDatabasePipeline:_query_novel_chapters():params info: {0}#####'.format(params))
 
             tx.execute(query_sql, params)

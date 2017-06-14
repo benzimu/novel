@@ -101,8 +101,7 @@ MYSQL_USER = 'root'
 MYSQL_PASSWORD = 'hjj'
 
 # start_urls配置
-START_URLS = ['http://book.easou.com/w/novel/18670767/0.html',
-              'http://book.easou.com/w/novel/16120847/0.html']
+START_URLS = ['http://www.piaotian.com/bookinfo/7/7981.html']
 
 # allowed_domains配置
-ALLOWED_DOMAINS = ['book.easou.com']
+ALLOWED_DOMAINS = ['www.piaotian.com']
