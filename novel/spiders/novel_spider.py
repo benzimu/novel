@@ -4,7 +4,7 @@
 """
 @author: ben
 @time: 4/11/17
-@desc: 
+@desc: 小说爬虫类
 """
 
 import scrapy
@@ -20,7 +20,6 @@ from novel.items import ChaptersItem
 from novel import settings
 
 from novel.utils.UrlParse import get_domain
-from novel.utils.Constant import Constant
 
 
 class NovelSpider(scrapy.Spider):
@@ -45,6 +44,11 @@ class NovelSpider(scrapy.Spider):
     start_urls = settings.START_URLS
 
     def parse(self, response):
+        """
+        scrapy框架执行爬取数据后的回调方法
+        :param response:
+        :return:
+        """
         logging.info('#####NovelSpider:parse()#####')
 
         novelitem = NovelItem()
@@ -63,14 +67,19 @@ class NovelSpider(scrapy.Spider):
 
         logging.info('#####NovelSpider:parse():novel_detail item info:{0}#####'.format(novelitem))
 
-
-        # 更新小说详情数据
+        # 更新小说详情表（novel_detail）数据
         self._update_novel_detail(novelitem)
 
+        # 爬取小说篇章目录
         yield scrapy.Request(novelitem['chapters_categore_href'], method='GET',
                              callback=self.chapters_categore, meta={'novel_detail': novelitem})
 
     def _update_novel_detail(self, item):
+        """
+        更新数据库小说详情表
+        :param item:
+        :return:
+        """
         update_sql = "update novel_detail set res_id=%s, author_href=%s, picture=%s, " \
                      "update_time=%s, status=%s, type=%s, type_href=%s, source=%s, description=%s, " \
                      "latest_chapters=%s, chapters_categore_href=%s where name=%s and author=%s"
@@ -86,29 +95,35 @@ class NovelSpider(scrapy.Spider):
             self.conn.commit()
             cur.close()
         except:
-            print traceback.format_exc()
+            logging.error("#####_update_novel_detail(): update novel_detail error :{0}#####".format(traceback.format_exc()))
 
     def chapters_categore(self, response):
+        """
+        爬取小说篇章目录回调方法：解析DOM节点，获取目录链接
+        :param response:
+        :return:
+        """
         logging.info('#####NovelSpider:chapters_categore():response info:{0}#####'.format(response))
 
         url = response.url
-
+        # 篇章目录链接
         categores_hrefs = response.xpath("//div[@class='centent']//li/a/@href").extract()[4:]
+        # 篇章名称
         categores_names = response.xpath("//div[@class='centent']//li/a/text()").extract()[4:]
 
         logging.info('#####NovelSpider:chapters_categore():categores_hrefs info:{0}#####'.format(categores_hrefs))
 
         novel_detail = response.meta['novel_detail']
 
+        # 查询数据库获取该小说篇章名，用以判断缺失数据
         cur = self.conn.cursor()
-
         query_name_sql = "select name from novel_chapters where novel_detail_id = " \
-                          "(select id from novel_detail where name=%s and author=%s)"
+                         "(select id from novel_detail where name=%s and author=%s)"
         params = (novel_detail['name'], novel_detail['author'])
-
         cur.execute(query_name_sql, params)
         res = cur.fetchall()
         logging.info('#####NovelSpider:chapters_categore():res info:{0}#####'.format(res))
+        # 判断该小说篇章是否为空，如果为空，则全部爬取，否则判断数据是否重复
         if res:
             # 上一次爬取小说章节可能由于多种原因导致没有爬取下来，接下来每次爬取最新章节时重复爬取没有入库的章节
             res_names = [res_name[0] for res_name in res]
@@ -127,6 +142,11 @@ class NovelSpider(scrapy.Spider):
         cur.close()
 
     def chapters_detail(self, response):
+        """
+        爬取小说章节内容回调方法：解析DOM节点，获取章节详情
+        :param response:
+        :return:
+        """
         logging.info('#####NovelSpider:chapters_detail():response info:{0}#####'.format(response))
 
         novel_item = response.meta['novel_detail']
@@ -134,7 +154,9 @@ class NovelSpider(scrapy.Spider):
         chapter_index = response.meta['chapter_index']
 
         chapter_item = ChaptersItem()
+
         chapter_item['source'] = response.url
+        # 小说来源，默认为当前域名
         source_domain = get_domain(chapter_item['source'])
         logging.info('#####NovelSpider:chapters_detail():source_domain info:{0}#####'.format(source_domain))
         if not source_domain:
@@ -153,9 +175,9 @@ class NovelSpider(scrapy.Spider):
         z = [_x for _x in x if _x in y]
 
         chapter_item['content'] = ''.join(z).strip()
-
         logging.info('#####NovelSpider:parse():novel_chapter item info:{0}#####'.format(chapter_item))
 
+        # 数据解析工作完成，将数据发送给下一组件(数据入库pipelines)
         yield {'novel_item': novel_item, 'chapter_item': chapter_item}
 
 
