@@ -101,7 +101,8 @@ MYSQL_USER = 'root'
 MYSQL_PASSWORD = 'hjj'
 
 # start_urls配置
-START_URLS = ['http://www.piaotian.com/bookinfo/7/7981.html']
+START_URLS = ['http://www.piaotian.com/bookinfo/7/7981.html',
+              'http://www.piaotian.com/bookinfo/7/7230.html']
 
 # allowed_domains配置
 ALLOWED_DOMAINS = ['www.piaotian.com']

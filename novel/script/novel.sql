@@ -10,7 +10,7 @@ CREATE TABLE novel_detail (
   type VARCHAR (20) COMMENT '类型：玄幻、都市、、、',
   type_href VARCHAR (255) COMMENT '类型详情链接',
   source VARCHAR (255) COMMENT '来源',
-  description VARCHAR (255) COMMENT '描述',
+  description TEXT COMMENT '描述',
   latest_chapters VARCHAR (50) COMMENT '最新章节,用于判断是否与数据库数据同步',
   chapters_categore_href VARCHAR (255) COMMENT '章节目录详情链接'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='小说详情表';
@@ -23,6 +23,6 @@ CREATE TABLE novel_chapters (
   source VARCHAR (255) COMMENT '来源',
   counts VARCHAR (255) COMMENT '第几章',
   name VARCHAR (255) COMMENT '章节名',
-  content TEXT (255) COMMENT '章节内容',
+  content TEXT COMMENT '章节内容',
   CONSTRAINT fk_chapters_detail FOREIGN KEY (novel_detail_id) REFERENCES novel_detail (id) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='小说章节';
